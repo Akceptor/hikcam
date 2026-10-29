@@ -1,0 +1,28 @@
+#!/bin/bash
+set -o pipefail
+
+src="${BASH_SOURCE[0]}"
+while [ -L "$src" ]; do
+  dir="$(cd -P "$(dirname "$src")" && pwd)"
+  src="$(readlink "$src")"
+  [[ $src != /* ]] && src="$dir/$src"
+done
+ROOT="$(cd -P "$(dirname "$src")/.." && pwd)"
+PY="$ROOT/.venv/bin/python"
+
+case "${1:-}" in
+  -h|--help)
+    echo "usage: hikcam [--vcam] [--no-preview] [--size WxH|auto] [--scale N] [--fps N]"
+    echo "keys: s resync, a/d shift 1px, w/x shift 1 row, q/Esc quit"
+    exit 0;;
+esac
+
+if [ ! -x "$PY" ]; then
+  echo "hikcam: $PY missing; run $ROOT/install.sh" >&2
+  exit 1
+fi
+
+# Capture needs root to detach the kernel driver; the sink stays in the user session
+# because OBS virtual camera and GUI windows do not work from a root process.
+sudo -v || exit 1
+sudo "$PY" -I "$ROOT/src/capture.py" | "$PY" -I "$ROOT/src/sink.py" "$@"
